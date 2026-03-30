@@ -23,33 +23,46 @@ int joyY = A0;
 int joyX = A1;
 
 
-bool imuAvailable false;
+
+#include <math.h>
+
+
+float pitch = 0;
+float roll = 0;
+float alpha = 0.98;
+float angle = 0;
+float dt = 0.01; // time for equations
+
+
+bool imuAvailable = false;
 
 
 void setup() {
   Serial.begin(9600);
 
 
-  pinMode(trigPin, OUTPUT )
-  pinMode(echoPin, INPUT )
-  pinMode(buzzPin, OUTPUT)
-  pinMode(joyButton, INPUT_PULLUP)
+  pinMode(trigPin, OUTPUT );
+  pinMode(echoPin, INPUT );
+  pinMode(buzzPin, OUTPUT);
+  pinMode(joyButton, INPUT_PULLUP);
 
   lcd.begin(20, 4);
   lcd.print("Hello, World!");
-  IMU.begin()
+  IMU.begin();
     if (!IMU.begin()) {
       Serial.println("Failed to initialize IMU!");
       imuAvailable = false;
-      IMU.end()
+      IMU.end();
       while (1);
-    else{
+    }else{
       imuAvailable = true;
     }
-}
+
 }
 
-void loop() {
+//void loop() {
+  
+  /*
   lcd.setCursor(0, 1);
   lcd.print(millis() / 1000);
   delay(1000);
@@ -65,34 +78,30 @@ void loop() {
 
   int distance = duration * 0.034 / 2; //calulaes distance based on spped of sound and half cause only need distance 
 
-  Serial.print("distance: ");//printing distance
-  serial.print(distance);
-  serial.print("cm");
-
+  //Serial.print("distance: ");//printing distance
+  //Serial.print(distance);
+  //Serial.print("cm");
+*/
   
-  float gx, gy, gz; //gyroscope X,Y,Z
-if (imuAvailable == true) {
-  if (IMU.gyroscopeAvailable()) {
-      IMU.readGyroscope(gx, gy, gz);
+void loop() {
+  float ax, ay, az;
+  float gx, gy, gz;
 
-      Serial.print(gx);
-      Serial.print('\t');
-      Serial.print(gy);
-      Serial.print('\t');
-      Serial.println(gz);
-  }
-  float ax, ay, az; //acclenrometer X,Y,Z
+  if (IMU.accelerationAvailable()) IMU.readAcceleration(ax, ay, az);
+  if (IMU.gyroscopeAvailable()) IMU.readGyroscope(gx, gy, gz);
 
-  if (IMU.accelerationAvailable()) {
-      IMU.readAcceleration(ax, ay, az);
+  float accel_pitch = atan2(ay, az) * 180 / PI;
+  float accel_roll  = atan2(ax, az) * 180 / PI;
 
-      Serial.print(ax);
-      Serial.print('\t');
-      Serial.print(ay);
-      Serial.print('\t');
-      Serial.println(az);
-}
+  pitch = alpha * (pitch + gx * dt) + (1 - alpha) * accel_pitch;
+  roll  = alpha * (roll  + gy * dt) + (1 - alpha) * accel_roll;
 
+  Serial.print(accel_pitch); Serial.print(",");
+  Serial.print(accel_roll);  Serial.print(",");
+  Serial.print(pitch);       Serial.print(",");
+  Serial.println(roll);
+
+  delay(100);
 }
 
 // Done with the IMU readings
@@ -101,4 +110,3 @@ if (imuAvailable == true) {
 
 
 
-}
