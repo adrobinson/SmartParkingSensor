@@ -189,7 +189,7 @@ class LCDDisplay {
     LiquidCrystal_74HC595 lcd;
   public:
     LCDDisplay() : lcd(11, 13, 12, 1, 3, 4, 5, 6, 7) {}
-    void begin() { lcd.begin(8, 2); }
+    void begin() { lcd.begin(16, 2); }
 
     void printDistanceF(int distance) {
       lcd.setCursor(0, 0);
