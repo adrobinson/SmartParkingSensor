@@ -13,3 +13,6 @@ mode switching manual ( joy stick)
 
 <img width="642" height="447" alt="image" src="https://github.com/user-attachments/assets/f22400cc-8fb4-4631-bb8e-a2a76ae16018" />
 
+
+<img width="593" height="592" alt="image" src="https://github.com/user-attachments/assets/9f9170cc-b4b6-44cc-a1e1-9219fa9b15a3" />
+
