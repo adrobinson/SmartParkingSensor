@@ -11,7 +11,7 @@ Yellow LED x2
 Red LED x2
 Buzzer x1
 Push button x1
-Resistors (for LEDs)
+Resistors 220Ohm(for LEDs)
 
 
 ## diagrams
