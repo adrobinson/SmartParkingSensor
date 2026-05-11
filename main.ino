@@ -39,7 +39,6 @@ class ultraSonic{
       } else {
         distance = duration * 0.034 / 2;
       }
-      //delay(60);
     }
 
     void calcVelocity(){
@@ -51,6 +50,7 @@ class ultraSonic{
       velocity = (float)(distance - lastDistance) / dt;
       lastDistance = distance;
     }
+
     bool isFailing() {
         if (distance == 999) {
             failCount++;
@@ -59,6 +59,7 @@ class ultraSonic{
         }
         return failCount >= 3;
     }
+
     void print(){
       Serial.print(name + ": ");
       Serial.println(duration == 0 ? "Out of range" : String(distance) + "cm");
@@ -101,23 +102,65 @@ class LED{
 };
 
 
+class LCDDisplay {
+  private:
+    LiquidCrystal_74HC595 lcd;
+  public:
+    LCDDisplay() : lcd(11, 13, 12, 1, 3, 4, 5, 6, 7) {}
+    void begin() { lcd.begin(16, 2); }
+
+    void crashScreen(){
+      lcd.setCursor(0, 0);
+      lcd.print("CRASH!          ");
+      lcd.setCursor(0, 1);
+      lcd.print("Hold RST btn");
+    }
+
+    void printRowF(int distance, float velocity) {
+        lcd.setCursor(0, 0);
+        if (distance == 999) {
+            lcd.print("Out of range    ");
+        } else {
+            String row = "F:" + String(distance) + "cm  ";
+            row += (velocity < -10) ? "SLOW DOWN" : "OK       ";
+            lcd.print(row);
+        }
+    }
+
+    void printRowB(int distance, float velocity) {
+        lcd.setCursor(0, 1);
+        if (distance == 999) {
+            lcd.print("Out of range    ");
+        } else {
+            String row = "B:" + String(distance) + "cm  ";
+            row += (velocity < -10) ? "SLOW DOWN" : "OK       ";
+            lcd.print(row);
+        }
+    }
+
+    void clear() { lcd.clear(); }
+
+    void printSensorError() {
+      lcd.setCursor(0, 0);
+      lcd.print("Add Sensors     ");
+      lcd.setCursor(0, 1);
+      lcd.print("                ");
+    }
+};
+
+
 class IMUClass{
   private:
     float ax, ay, az;
-    float gx, gy, gz;
     float accel_pitch, accel_roll;
     float pitch, roll;
-    float alpha;
-    unsigned long lastTime;
     bool imuAvailable;
     bool crashDetected;
 
   public:
     IMUClass(){
-      alpha = 0.98;
       pitch = 0;
       roll  = 0;
-      lastTime = 0;
       imuAvailable = false;
       crashDetected = false;
     }
@@ -128,29 +171,27 @@ class IMUClass{
             imuAvailable = false;
             while (1);
         }
-        lastTime = millis();  // start dt from now, not from boot
         imuAvailable = true;
     }
-
-    void read() {
-      if (IMU.accelerationAvailable()) IMU.readAcceleration(ax, ay, az);
-      if (IMU.gyroscopeAvailable())    IMU.readGyroscope(gx, gy, gz);
+    float getMagnitude() {
+        return sqrt(ax*ax + ay*ay + az*az);
     }
-    void printCrashValues(){
-    float magnitude = sqrt(ax*ax + ay*ay + az*az);
-    Serial.print("Mag: ");   Serial.print(magnitude);
-    Serial.print("  Roll: "); Serial.print(roll);
-    Serial.print("  Pitch: "); Serial.println(pitch);
-}
-
+    void read() {
+        while (!IMU.accelerationAvailable());
+        IMU.readAcceleration(ax, ay, az);
+    }
     void process(){
-        unsigned long now = millis();
-        float dt = (now - lastTime) / 1000.0;
-        lastTime = now;
         accel_roll  = atan2(ay, az) * 180.0 / PI;
         accel_pitch = atan2(-ax, sqrt(ay*ay + az*az)) * 180.0 / PI;
-        pitch = alpha * (pitch + gy * dt) + (1 - alpha) * accel_pitch;  // gy not gx
-        roll  = alpha * (roll  + gx * dt) + (1 - alpha) * accel_roll;   // gx not gy
+        pitch = accel_pitch;
+        roll  = accel_roll;
+    }
+
+    void printCrashValues(){
+        float magnitude = sqrt(ax*ax + ay*ay + az*az);
+        Serial.print("Mag: ");    Serial.print(magnitude);
+        Serial.print("  Roll: "); Serial.print(roll);
+        Serial.print("  Pitch: "); Serial.println(pitch);
     }
 
     void printFiltered(){
@@ -158,20 +199,15 @@ class IMUClass{
       Serial.print("Roll: ");  Serial.println(roll);
     }
 
-    void printRaw(){
-        Serial.print("AccelPitch: "); Serial.println(accel_pitch);
-        Serial.print("AccelRoll: ");  Serial.println(accel_roll);
-    }
-
     bool crash(){
-      float magnitude = sqrt(ax*ax + ay*ay + az*az);
-      if (magnitude > 4 || roll > 100 || pitch > 100){
-        crashDetected = true;
-        Serial.println("crash");
-      } else {
-        Serial.println("nocrash");
-      }
-      return crashDetected;
+        float magnitude = sqrt(ax*ax + ay*ay + az*az);
+        if (magnitude > 4 || fabs(roll) > 100 || fabs(pitch) > 100){
+            crashDetected = true;
+            Serial.println("crash");
+        } else {
+            Serial.println("nocrash");
+        }
+        return crashDetected;
     }
 
     void resetCrash(){
@@ -203,88 +239,42 @@ class Button {
 };
 
 
-class LCDDisplay {
-  private:
-    LiquidCrystal_74HC595 lcd;
-  public:
-    LCDDisplay() : lcd(11, 13, 12, 1, 3, 4, 5, 6, 7) {}
-    void begin() { lcd.begin(16, 2); }
-
-    void printDistanceF(int distance) {
-      lcd.setCursor(0, 0);
-      lcd.print("D");
-      lcd.print(distance);
-      lcd.print("cm  ");
-    }
-
-    void printDistanceB(int distance){
-      lcd.setCursor(0, 1);
-      lcd.print("D:");
-      lcd.print(distance);
-      lcd.print("cm  ");
-    }
-
-    void crashScreen(){
-      lcd.setCursor(0, 0);
-      lcd.print("CRASH!          ");
-      lcd.setCursor(0, 1);
-      lcd.print("Hold RST btn");
-    }
-
-    void printApproachF(float velocity) {
-      lcd.setCursor(7, 0);
-      if (velocity < -10) { lcd.print("SLOW DOWN"); }
-      else { lcd.print("OK       "); }
-    }
-
-    void printApproachB(float velocity) {
-      lcd.setCursor(7, 1);
-      if (velocity < -10) { lcd.print("SLOW DOWN"); }
-      else { lcd.print("OK       "); }
-    }
-
-    void clear() { lcd.clear(); }
-   
-
-    void printSensorError() {
-      lcd.setCursor(0, 0);
-      lcd.print("Add Sensors     ");
-      lcd.setCursor(0, 1);
-      lcd.print("                ");
-    }
-};
-
-
-
 class Buzzer {
   private:
     int buzPin;
+    unsigned long lastBuzzTime = 0;
+    unsigned long buzzDuration = 0;
+    bool buzzing = false;
   public:
     Buzzer(int Pin){
       buzPin = Pin;
       pinMode(buzPin, OUTPUT);
     }
 
-    void warnBuz(int distance){
-      if (distance <= 100 && distance >= 26){
-        digitalWrite(buzPin, HIGH); delay(500); digitalWrite(buzPin, LOW);
-      } else { digitalWrite(buzPin, LOW); }
+    void update() {
+      if (buzzing && millis() - lastBuzzTime >= buzzDuration) {
+        digitalWrite(buzPin, LOW);
+        buzzing = false;
+      }
     }
 
-    void closeBuz(int distance){
-      if (distance <= 25 && distance >= 6){
-        digitalWrite(buzPin, HIGH); delay(100); digitalWrite(buzPin, LOW);
-      } else { digitalWrite(buzPin, LOW); }
+    void buzz(int distance) {
+        if (buzzing) return;
+        if (distance <= 5) {
+            digitalWrite(buzPin, HIGH);
+            lastBuzzTime = millis(); buzzDuration = 20; buzzing = true;
+        } else if (distance <= 25) {
+            digitalWrite(buzPin, HIGH);
+            lastBuzzTime = millis(); buzzDuration = 100; buzzing = true;
+        } else if (distance <= 100) {
+            digitalWrite(buzPin, HIGH);
+            lastBuzzTime = millis(); buzzDuration = 500; buzzing = true;
+        }
     }
 
-    void dangerBuz(int distance){
-      if (distance <= 5){
-        digitalWrite(buzPin, HIGH); delay(20); digitalWrite(buzPin, LOW);
-      } else { digitalWrite(buzPin, LOW); }
-    }
-
-    void off(){ digitalWrite(buzPin, LOW); }
+    void off(){ buzzing = false; digitalWrite(buzPin, LOW); }
 };
+
 
 ultraSonic sensor1("Dist1", 9, 7);
 ultraSonic sensor2("Dist2", 5, 6);
@@ -301,25 +291,26 @@ LED redLedB   ("red",    A2);
 
 Button crashReset(8);
 Buzzer buzzer(A0);
-
+unsigned long lastLoopTime = 0;
 void setup() {
   Serial.begin(9600);
-  imu.begin();
   lcd.begin();
-  sensor1.begin();  // re-assert after lcd.begin()
-  sensor2.begin();  // this is the critical one 
+  imu.begin();
+  sensor1.begin();
+  sensor2.begin();
 }
 
 void loop() {
+  buzzer.update();
+
   imu.read();
   imu.process();
 
-  if (imu.crash()) {
+  if (imu.isCrashed()) {
     greenLedF.off();  yellowLedF.off();  redLedF.off();
     greenLedB.off();  yellowLedB.off();  redLedB.off();
     buzzer.off();
     lcd.crashScreen();
-
     if (crashReset.press()) {
       imu.resetCrash();
       lcd.clear();
@@ -327,6 +318,12 @@ void loop() {
     return;
   }
 
+  if (imu.crash()) return;
+
+  unsigned long currentTime = millis();
+  if (currentTime - lastLoopTime < 500) return;
+  lastLoopTime = currentTime;
+  
   sensor1.read();
   delay(60);
   sensor2.read();
@@ -334,15 +331,12 @@ void loop() {
   sensor2.calcVelocity();
   imu.printCrashValues();
 
-  // check if sensors are reading
-if (sensor1.isFailing() || sensor2.isFailing()) {
+  if (sensor1.isFailing() || sensor2.isFailing()) {
     lcd.printSensorError();
-} else {
-    lcd.printDistanceF(sensor1.getDistance());
-    lcd.printApproachF(sensor1.getVelocity());
-    lcd.printDistanceB(sensor2.getDistance());
-    lcd.printApproachB(sensor2.getVelocity());
-}
+  } else {
+    lcd.printRowF(sensor1.getDistance(), sensor1.getVelocity());
+    lcd.printRowB(sensor2.getDistance(), sensor2.getVelocity());
+  }
 
   greenLedF.safe   (sensor1.getDistance());
   yellowLedF.warning(sensor1.getDistance());
@@ -353,13 +347,25 @@ if (sensor1.isFailing() || sensor2.isFailing()) {
   redLedB.close    (sensor2.getDistance());
 
   int closest = min(sensor1.getDistance(), sensor2.getDistance());
-  buzzer.warnBuz  (closest);
-  buzzer.closeBuz (closest);
-  buzzer.dangerBuz(closest);
+  //buzzer.warnBuz  (closest);
+  //buzzer.closeBuz (closest);
+  //buzzer.dangerBuz(closest);
+  buzzer.buzz(closest);
 
   sensor1.print();
   sensor2.print();
   imu.printFiltered();
 
-  delay(500);
+
+  Serial.print("DATA,");
+  Serial.print(millis());                 Serial.print(",");
+  Serial.print(sensor1.getDistance());    Serial.print(",");
+  Serial.print(sensor2.getDistance());    Serial.print(",");
+  Serial.print(imu.getRoll());            Serial.print(",");
+  Serial.print(imu.getPitch());           Serial.print(",");
+  Serial.print(imu.getMagnitude());       Serial.print(",");
+  Serial.println(imu.isCrashed() ? 1 : 0);
+
+
+ // delay(500);
 }
